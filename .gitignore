@@ -1,0 +1,14 @@
+# python cache
+*.pyc
+*.pyc
+__pycache__
+.mypy_cache
+
+# virtualenv
+venv
+
+# VSC
+.vscode
+
+# secrets
+.env

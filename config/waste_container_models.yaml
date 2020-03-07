@@ -1,0 +1,56 @@
+# List of groups to create via the API
+groups:
+
+  # generic wasteContainerModel definitions
+  wasteContainerModel:
+    entity_type: wasteContainerModel
+    apikey: wasteContainerModel_lanzarote
+    protocol:
+    - IoTA-JSON
+    attributes:
+    - name: width
+      type: float
+    - name: height
+      type: float
+    - name: depth
+      type: float
+    - name: volumeStored
+      type: float
+      expression: "${0.95*@width*@height*@depth}"
+    - name: width
+      type: float
+    - name: height
+      type: float
+    - name: depth
+      type: float
+    - name: brandName
+      type: string
+    - name: modelName
+      type: string
+    - name: madeOf
+      type: string
+      # Possible values:
+      #- plastic
+      #- wood
+      #- metal
+      #- other
+    - name: maximumLoad
+      type: float
+
+# List of entities to create via the API
+entities:
+
+  # Modelo de contenedores marca Molukas modelo test
+  wcm_molukas_test:
+    _group: wasteContainerModel
+    device_id: wcm_molukas_test
+    entity_name: Modelo de contenedores marca Molukas modelo test
+    protocol: IoTA-JSON
+    attributes:
+      width: 2
+      height: 1.5
+      depth: 1
+      brandName: molukas
+      modelName: test
+      madeOf: plastic
+      maximumLoad: 0.95
