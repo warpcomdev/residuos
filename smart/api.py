@@ -96,7 +96,7 @@ class Api:
             """Create a set of groups"""
             data = {kind: tuple(item.asdict() for item in sequence)}
             resp = await session.post(url, headers=headers, json=data)
-            if resp.status < 200 or resp.status > 204:
+            if resp.status != 201:
                 raise FetchError(url, resp, headers=headers, json=data)
 
         # pylint: disable=no-member

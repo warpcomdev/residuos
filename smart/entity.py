@@ -69,6 +69,8 @@ class Entity:
         static = lambda attrib: attrib.value is not None
         clone['static_attributes'] = tuple(filter(static, attributes))
         clone['attributes'] = tuple(filterfalse(static, attributes))
+        if ' ' in clone['entity_name']:
+            raise ValueError(f"Entity Name '{clone['entity_name']}' invalid")
         try:
             return cls(**clone)
         except TypeError as err:

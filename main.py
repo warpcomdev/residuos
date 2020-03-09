@@ -119,12 +119,14 @@ async def main():
     for fname in config.files():
         logging.info("Reading groups from file: %s", fname)
         groups.update(Group.fromfile(fname))
+    logging.info("Groups loaded: %s", groups.keys())
 
     # Now, real all entities
     entities = dict()
     for fname in config.files():
         logging.info("Reading entities from file: %s", fname)
         entities.update(Entity.fromfile(groups, fname))
+    logging.info("Entities loaded: %s", entities.keys())
 
     if config.delete:
         await delete_entities(api, groups.values(), entities.values())

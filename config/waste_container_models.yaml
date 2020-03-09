@@ -44,7 +44,7 @@ entities:
   wcm_molukas_test:
     _group: wasteContainerModel
     device_id: wcm_molukas_test
-    entity_name: Modelo de contenedores marca Molukas modelo test
+    entity_name: wcm_molukas_test
     protocol: IoTA-JSON
     attributes:
       width: 2

@@ -116,13 +116,13 @@ entities:
   # Group for wasteContainers 1.5m deep
   wc_molukas_test_1:
     <<: *wasteContainer_1_5m
-    device_id: wasteContainer_1
-    entity_name: Contenedor test 1
+    device_id: wc_molukas_test_1
+    entity_name: wc_molukas_test_1
     _override:
       areaServed: "Calle test 1"
       containerIsle: isla1
       isleId: isla1
-      location: 34.5556 -1.4432
+      location: 34.5556, -1.4432
       serialNumber: 123456
       status: unknown
       storedWasteKind: organic
