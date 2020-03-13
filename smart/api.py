@@ -14,6 +14,7 @@ from .entity import Entity
 CHUNK_SIZE = 8
 
 try:
+    # pylint: disable=ungrouped-imports
     from typing import Protocol
 
     # pylint: disable=too-few-public-methods

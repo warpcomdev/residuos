@@ -10,7 +10,7 @@ import configargparse
 import attr
 import aiohttp
 
-from smart import Group, Entity, Api
+from smart import Group, Entity, Api, Factory
 
 
 @attr.s(auto_attribs=True)
@@ -115,23 +115,26 @@ async def main():
               password=config.password)
 
     # Read all groups first
-    groups = dict()
+    factory = Factory(dict())
+    groups = list()
     for fname in config.files():
         logging.info("Reading groups from file: %s", fname)
-        groups.update(Group.fromfile(fname))
-    logging.info("Groups loaded: %s", groups.keys())
+        groups.extend(Group.fromfile(factory, fname))
+    logging.info("%d Groups loaded: %s", len(groups),
+                 ", ".join(g.apikey for g in groups))
 
     # Now, real all entities
-    entities = dict()
+    entities = list()
     for fname in config.files():
         logging.info("Reading entities from file: %s", fname)
-        entities.update(Entity.fromfile(groups, fname))
-    logging.info("Entities loaded: %s", entities.keys())
+        entities.extend(Entity.fromfile(factory, fname))
+    logging.info("%d Entities loaded: %s", len(entities),
+                 ",".join(e.device_id for e in entities))
 
     if config.delete:
-        await delete_entities(api, groups.values(), entities.values())
+        await delete_entities(api, groups, entities)
     else:
-        await create_entities(api, groups.values(), entities.values())
+        await create_entities(api, groups, entities)
 
 
 if __name__ == "__main__":

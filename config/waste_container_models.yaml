@@ -1,56 +1,52 @@
-# List of groups to create via the API
-groups:
-
-  # generic wasteContainerModel definitions
-  wasteContainerModel:
-    entity_type: wasteContainerModel
-    apikey: wasteContainerModel_lanzarote
-    protocol:
-    - IoTA-JSON
-    attributes:
-    - name: width
-      type: float
-    - name: height
-      type: float
-    - name: depth
-      type: float
-    - name: volumeStored
-      type: float
-      expression: "${0.95*@width*@height*@depth}"
-    - name: width
-      type: float
-    - name: height
-      type: float
-    - name: depth
-      type: float
-    - name: brandName
-      type: string
-    - name: modelName
-      type: string
-    - name: madeOf
-      type: string
-      # Possible values:
-      #- plastic
-      #- wood
-      #- metal
-      #- other
-    - name: maximumLoad
-      type: float
-
 # List of entities to create via the API
 entities:
 
-  # Modelo de contenedores marca Molukas modelo test
-  wcm_molukas_test:
-    _group: wasteContainerModel
-    device_id: wcm_molukas_test
-    entity_name: wcm_molukas_test
-    protocol: IoTA-JSON
-    attributes:
-      width: 2
+# Modelo de contenedores marca Molukas modelo test
+- device_id: wcm_molukas_model_1
+  entity_type: wasteContainerModel
+  entity_name: wcm_molukas_model_1
+  protocol: IoTA-JSON
+  attributes:
+  - name: brandName
+    type: string
+    value: molukas
+  - name: modelName
+    type: string
+    value: test
+  - name: madeOf
+    type: string
+    value: plastic
+    # Possible values:
+    #- plastic
+    #- wood
+    #- metal
+    #- other
+  - name: width
+    type: float
+    value: 2
+  - name: height
+    type: float
+    value: 1.5
+  - name: depth
+    type: float
+    value: 1
+  - name: maximumLoad
+    type: float
+    value: 0.95
+  - name: volumeStored
+    type: float
+    #expression: "${@width*@height*@depth*@maximumLoad}"
+    value: 2.85
+
+- device_id: wcm_molukas_model_2
+  entity_name: wcm_molukas_model_2
+  protocol: IoTA-JSON
+  _inherit:
+  - device_id: wcm_molukas_model_1
+    values:
+      madeOf: metal
+      width: 1.5
       height: 1.5
       depth: 1
-      brandName: molukas
-      modelName: test
-      madeOf: plastic
-      maximumLoad: 0.95
+      volumeStored: 2
+

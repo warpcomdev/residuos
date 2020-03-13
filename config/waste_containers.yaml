@@ -1,129 +1,109 @@
 # List of groups to create via the API
 groups:
 
-  # Base model for all wasteContainer groups.
-  # Beginning with '_' will make this group private,
-  # i.e. no group will actually be created in the
-  # context broker. This is just to be overriden.
-  _wasteContainer: &wasteContainer
-    entity_type: wasteContainer
-    protocol:
-    - IoTA-JSON
-    attributes:
-    - name: areaServed
-      type: string
-    - name: category
-      type: array
-      # Possible values:
-      #- fixed
-      #- underground
-      #- ground
-      #- portable
-      #- other
-    - name: containerIsle
-      type: string
-    - name: description
-      type: string
-    - name: isleId
-      type: string
-    - name: location
-      type: "geo:point"
-    - name: refWasteContainerModel
-      type: string
-    - name: serialNumber
-      type: string
-    - name: fillingLevel
-      type: float
-    - name: status
-      type: string
-      # Possible values:
-      #- ok
-      #- lidOpen
-      #- dropped
-      #- moved
-      #- vandalized
-      #- burning
-      #- unknown
-    - name: storedWasteKind
-      type: string
-      # Possible values:
-      #- organic
-      #- inorganic
-      #- glass
-      #- oil
-      #- plastic
-      #- metal
-      #- paper
-      #- batteries
-      #- electronics
-      #- hazardous
-      #- other
-    - name: storedWasteOrigin
-      type: string
-      # Possible values:
-      #- household
-      #- municipal
-      #- industrial
-      #- construction
-      #- hostelry
-      #- agriculture
-      #- other
-    - name: temperature
-      type: float
-    - name: dateLastEmptying
-      type: "date"
-    - name: dateUpdated
-      type: "date"
-    - name: dateNextActuation
-      type: "date"
-    - name: weight
-      type: float
-    - name: methaneConcentration
-      type: float
-
-  # Group for wasteContainers 1.5m deep
-  wasteContainer_1.5m:
-    apikey: wasteContainer_lanzarote_1.5m
-    <<: *wasteContainer
-    # _override key is used to override attributes.
-    _override:
-    - name: fillingLevel
-      type: float
-      expression: "${(150 - @fillingLevel) / 150}"
-      object_id: h
-    - name: temperature
-      type: float
-      object_id: t
+# Standard waste containers, 1.5m deep
+- entity_type: wasteContainer
+  apikey: wc_molukas_containers_1.5m
+  protocol:
+  - IoTA-JSON
+  attributes:
+  - name: areaServed
+    type: string
+  - name: category
+    type: array
+    # Possible values:
+    #- fixed
+    #- underground
+    #- ground
+    #- portable
+    #- other
+  - name: containerIsle
+    type: string
+  - name: description
+    type: string
+  - name: isleId
+    type: string
+  - name: location
+    type: "geo:point"
+  - name: refWasteContainerModel
+    type: string
+  - name: serialNumber
+    type: string
+  - name: status
+    type: string
+    # Possible values:
+    #- ok
+    #- lidOpen
+    #- dropped
+    #- moved
+    #- vandalized
+    #- burning
+    #- unknown
+  - name: storedWasteKind
+    type: string
+    # Possible values:
+    #- organic
+    #- inorganic
+    #- glass
+    #- oil
+    #- plastic
+    #- metal
+    #- paper
+    #- batteries
+    #- electronics
+    #- hazardous
+    #- other
+  - name: storedWasteOrigin
+    type: string
+    # Possible values:
+    #- household
+    #- municipal
+    #- industrial
+    #- construction
+    #- hostelry
+    #- agriculture
+    #- other
+  - name: dateLastEmptying
+    type: "date"
+  - name: dateUpdated
+    type: "date"
+  - name: dateNextActuation
+    type: "date"
+  - name: weight
+    type: float
+  - name: methaneConcentration
+    type: float
+  - name: fillingLevel
+    type: float
+    expression: "${(150 - @fillingLevel) / 150}"
+    object_id: h
+  - name: temperature
+    type: float
+    object_id: t
 
 # List of entities to create via the API
 entities:
 
-  # Parámetros comunes contenedor de pruebas
-  _wasteContainer_1.5m: &wasteContainer_1_5m
-    _group: wasteContainer_1.5m
-    protocol: IoTA-JSON
-    attributes:
-      refWasteContainerModel: wcm_molukas_test
+# First test container
+- device_id: wc_molukas_container_1
+  entity_name: wc_molukas_container_1
+  protocol: IoTA-JSON
+  _inherit:
+  - apikey: wc_molukas_containers_1.5m
+    values:
+      areaServed: "Calle test 1"
+      category: ['ground']
+      containerIsle: isla1
+      description: Contenedor superficie de 1.5 metros
+      isleId: isla1
+      location: 34.5556, -1.4432
+      refWasteContainerModel: wcm_molukas_model_1
+      serialNumber: 123456
+      status: unknown
+      storedWasteKind: organic
+      storedWasteOrigin: household
       dateLastEmptying: "1900-01-01"
       dateUpdated: "1900-01-01"
       dateNextActuation: "1900-01-01"
       weight: 0
       methaneConcentration: 0
-      category:
-      - ground
-      description: Contenedor superficie de 1.5 metros
-
-  # Group for wasteContainers 1.5m deep
-  wc_molukas_test_1:
-    <<: *wasteContainer_1_5m
-    device_id: wc_molukas_test_1
-    entity_name: wc_molukas_test_1
-    _override:
-      areaServed: "Calle test 1"
-      containerIsle: isla1
-      isleId: isla1
-      location: 34.5556, -1.4432
-      serialNumber: 123456
-      status: unknown
-      storedWasteKind: organic
-      storedWasteOrigin: household

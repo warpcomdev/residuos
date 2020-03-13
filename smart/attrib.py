@@ -1,5 +1,6 @@
 """Device / Group Attribute"""
 
+import itertools
 from typing import Optional, Mapping, Any
 import attr
 
@@ -40,3 +41,13 @@ class Attrib:
     def clone(cls, item):
         """Clone item"""
         return cls.fromdict(attr.asdict(item))
+
+    @staticmethod
+    def chain(*arg):
+        """Chain several (possibly None) sequences of Attribs"""
+        visited = set()
+        for attrib in itertools.chain(*(item for item in reversed(arg)
+                                        if item is not None)):
+            if attrib.name not in visited:
+                visited.add(attrib.name)
+                yield attrib
