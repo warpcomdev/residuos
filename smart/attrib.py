@@ -44,7 +44,11 @@ class Attrib:
 
     @staticmethod
     def chain(*arg):
-        """Chain several (possibly None) sequences of Attribs"""
+        """
+        Chain several (possibly None) sequences of Attribs.
+        Chaining is done in reversed order, i.e attributes from later
+        sequences override attributes from former sequences.
+        """
         visited = set()
         for attrib in itertools.chain(*(item for item in reversed(arg)
                                         if item is not None)):

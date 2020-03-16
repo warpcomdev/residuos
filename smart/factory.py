@@ -9,7 +9,7 @@ from .attrib import Attrib
 
 @attr.s(auto_attribs=True)
 class AttribList:
-    """Atribute List"""
+    """List of attributes with attached entity type"""
     entity_type: str
     static_attributes: Optional[Sequence[Attrib]] = None
     attributes: Optional[Sequence[Attrib]] = None
@@ -43,6 +43,11 @@ class Factory:
         """
         Represents an 'inheritance' relationship between an entity/group
         and another entities/groups.
+        An object with an '_inherit' section will get an entity_type
+        and list of attributes from the inherited object(s), identified
+        by either device_id (entity) or apikey (group).
+        The inherited attributes can optionally be given a static value,
+        becoming static_attributes.
         """
         device_id: Optional[str] = None
         apikey: Optional[str] = None
@@ -98,15 +103,19 @@ class Factory:
                     inherit: Sequence[Inherit]) -> str:
         """Merges the attributes from the inheritance list"""
         inherited = (self._inherit(entry) for entry in inherit)
-        proper = (Attrib.fromdict(item)
+        my_own = (Attrib.fromdict(item)
                   for item in data.get('attributes', tuple()))
-        return tuple(Attrib.chain(*inherited, proper))
+        return tuple(Attrib.chain(*inherited, my_own))
 
     def __call__(self, key: str, data: Mapping[str, Any]) -> AttribList:
         """
         Reads the '_inherit' and 'attributes' fields in data, builds
-        an AttribList with them, and saves unker 'key' for future _inherit.
+        an AttribList with them, and saves it under 'key' for future
+        objects that may _inherit it.
         """
+        # Warn on duplicate keys
+        if self.references.get(key, None) is not None:
+            raise KeyError(f'Duplicate key {key}')
         # Support both dict and list for _inherit
         raw_inherit = data.get('_inherit', tuple())
         if hasattr(raw_inherit, 'items'):
