@@ -2,11 +2,10 @@
 
 import json
 import logging
-import asyncio
 from typing import Sequence, Iterable, Mapping, Tuple, Optional, Any
 import attr
 import aiohttp
-from aiostream import stream, pipe
+from aiostream import stream, pipe, async_
 
 from .error import FetchError
 from .factory import AttribList
@@ -15,6 +14,12 @@ from .entity import Entity
 
 # Number of entities / groups created per request
 CHUNK_SIZE = 8
+
+
+async def gather(*awaitables):
+    """Portable version of asyncio.gather based on aiostream"""
+    #pylint: disable=no-member
+    await (stream.iterate(awaitables) | pipe.map(async_(lambda task: task)))
 
 
 @attr.s(auto_attribs=True)
@@ -149,10 +154,11 @@ class Api:
     async def delete_entities(self, session: aiohttp.ClientSession,
                               entities: Sequence[Entity]):
         """Delete the groups using the API"""
+        # Delete from IOTA
         iota = ((f'{self.url_iotagent}/iot/devices/{entity.device_id}', {
             'protocol': entity.protocol
         }) for entity in entities)
-        cygnus = ((f'{self.url_cb}/v2/entities/{entity.device_id}', None)
-                  for entity in entities)
-        await asyncio.gather(self._delete(session, iota),
-                             self._delete(session, cygnus))
+        # And also from context broker
+        ctxb = ((f'{self.url_cb}/v2/entities/{entity.device_id}', None)
+                for entity in entities)
+        await gather(self._delete(session, iota), self._delete(session, ctxb))

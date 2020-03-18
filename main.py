@@ -12,7 +12,7 @@ import attr
 import aiohttp
 import yaml
 
-from smart import AttribList, Group, Entity, Api, Factory
+from smart import AttribList, Group, Entity, Api, gather, Factory
 
 
 @attr.s(auto_attribs=True)
@@ -93,8 +93,8 @@ async def create_entities(api: Api, groups: Sequence[Group],
             verify_ssl=False)) as session:
         await api.auth(session)
         logging.info("Creating objects")
-        await asyncio.gather(api.create_groups(session, groups),
-                             api.create_entities(session, entities))
+        await gather(api.create_groups(session, groups),
+                     api.create_entities(session, entities))
 
 
 async def delete_entities(api: Api, groups: Sequence[Group],
@@ -104,8 +104,8 @@ async def delete_entities(api: Api, groups: Sequence[Group],
             verify_ssl=False)) as session:
         await api.auth(session)
         logging.info("Deleting objects")
-        await asyncio.gather(api.delete_groups(session, groups),
-                             api.delete_entities(session, entities))
+        await gather(api.delete_groups(session, groups),
+                     api.delete_entities(session, entities))
 
 
 def print_entities(groups: Sequence[Group], entities: Sequence[Entity]):
