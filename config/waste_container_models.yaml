@@ -37,16 +37,4 @@ entities:
     type: float
     #expression: "${@width*@height*@depth*@maximumLoad}"
     value: 2.85
-
-- device_id: wcm_molukas_model_2
-  entity_name: wcm_molukas_model_2
-  protocol: IoTA-JSON
-  _inherit:
-  - device_id: wcm_molukas_model_1
-    values:
-      madeOf: metal
-      width: 1.5
-      height: 1.5
-      depth: 1
-      volumeStored: 2
-
+  

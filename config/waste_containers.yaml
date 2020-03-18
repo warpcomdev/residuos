@@ -96,7 +96,7 @@ entities:
       containerIsle: isla1
       description: Contenedor superficie de 1.5 metros
       isleId: isla1
-      location: 34.5556, -1.4432
+      location: 28.999880, -13.611424
       refWasteContainerModel: wcm_molukas_model_1
       serialNumber: 123456
       status: unknown
@@ -107,3 +107,16 @@ entities:
       dateNextActuation: "1900-01-01"
       weight: 0
       methaneConcentration: 0
+
+# Second test container
+- device_id: wc_molukas_container_2
+  entity_name: wc_molukas_container_2
+  protocol: IoTA-JSON
+  _inherit:
+  - device_id: wc_molukas_container_1
+    values:
+      areaServed: "Calle test 2"
+      containerIsle: isla2
+      isleId: isla2
+      location: 28.996589, -13.612841
+      serialNumber: 654321
