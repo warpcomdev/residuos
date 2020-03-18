@@ -21,13 +21,17 @@ class Entity(AttribList):
                            recurse=True,
                            filter=(lambda attr, v: v is not None))
 
+    def key(self) -> str:
+        """Return entity id"""
+        return self.device_id
+
     @classmethod
     def fromdict(cls, factory: Factory, data: Mapping[str, Any]):
         """Creates an Entity object from a dict"""
         try:
             device_id = data['device_id']
             atlist = factory(device_id, data)
-            return cls(device_id=data['device_id'],
+            return cls(device_id=device_id,
                        entity_type=atlist.entity_type,
                        entity_name=data['entity_name'],
                        protocol=data['protocol'],

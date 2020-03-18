@@ -18,9 +18,13 @@ class AttribList:
         """Chains static and dynamic attribs"""
         return Attrib.chain(self.static_attributes, self.attributes)
 
-    def asdict(self):
+    def asdict(self) -> Mapping[str, Any]:
         """To be overriden by derived classes"""
         raise NotImplementedError("AttribList.asdict()")
+
+    def key(self) -> str:
+        """To be overriden by derived classes"""
+        raise NotImplementedError("AttribList.key()")
 
     @classmethod
     def fromattr(cls, entity_type: str, attribs: Sequence[Attrib]):

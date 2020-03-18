@@ -20,14 +20,18 @@ class Group(AttribList):
                            recurse=True,
                            filter=(lambda attr, v: v is not None))
 
+    def key(self) -> str:
+        """Return group API key"""
+        return self.apikey
+
     @classmethod
     def fromdict(cls, factory: Factory, data: Mapping[str, Any]):
         """Creates a Group object from a dict"""
         try:
             apikey = data['apikey']
             atlist = factory(apikey, data)
-            return cls(entity_type=atlist.entity_type,
-                       apikey=apikey,
+            return cls(apikey=apikey,
+                       entity_type=atlist.entity_type,
                        protocol=data['protocol'],
                        static_attributes=atlist.static_attributes,
                        attributes=atlist.attributes)

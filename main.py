@@ -5,12 +5,14 @@ import stat
 import os
 import asyncio
 import logging
-from typing import Sequence
+from collections import defaultdict
+from typing import Sequence, Mapping
 import configargparse
 import attr
 import aiohttp
+import yaml
 
-from smart import Group, Entity, Api, Factory
+from smart import AttribList, Group, Entity, Api, Factory
 
 
 @attr.s(auto_attribs=True)
@@ -18,12 +20,14 @@ class Config:
     """Configuration parameters"""
     path: Sequence[str]
     url_keystone: str = "Full URL of the keystone API"
+    url_cb: str = "Full URL of the context broker"
     url_iotagent: str = "Full URL of the IOTA API"
     service: str = "Service name"
     subservice: str = "/Subservice path"
     username: str = "API User name"
     password: str = "API User password"
     delete: bool = False
+    markdown: bool = False
 
     @classmethod
     def must(cls, prefix: str):
@@ -48,6 +52,11 @@ class Config:
                           '--delete',
                           action='store_true',
                           help='Delete entities (instead of create)')
+            elif field.name == 'markdown':
+                parse.add('-md',
+                          '--markdown',
+                          action='store_true',
+                          help='print the entities in markdown')
             else:
                 # pylint: disable=bad-continuation
                 parse.add(f'--{field.name}',
@@ -83,10 +92,9 @@ async def create_entities(api: Api, groups: Sequence[Group],
     async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(
             verify_ssl=False)) as session:
         await api.auth(session)
-        logging.info("Creating groups in IOTAM")
-        await api.create_groups(session, groups)
-        logging.info("Creating entities in IOTAM")
-        await api.create_entities(session, entities)
+        logging.info("Creating objects")
+        await asyncio.gather(api.create_groups(session, groups),
+                             api.create_entities(session, entities))
 
 
 async def delete_entities(api: Api, groups: Sequence[Group],
@@ -95,10 +103,29 @@ async def delete_entities(api: Api, groups: Sequence[Group],
     async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(
             verify_ssl=False)) as session:
         await api.auth(session)
-        logging.info("Deleting groups in IOTAM")
-        await api.delete_groups(session, groups)
-        logging.info("Deleting entities in IOTAM")
-        await api.delete_entities(session, entities)
+        logging.info("Deleting objects")
+        await asyncio.gather(api.delete_groups(session, groups),
+                             api.delete_entities(session, entities))
+
+
+def print_entities(groups: Sequence[Group], entities: Sequence[Entity]):
+    """Print entities in markdown format"""
+    typemap: Mapping[str, AttribList] = defaultdict(list)
+    for group in groups:
+        typemap[group.entity_type].append(group)
+    for entity in entities:
+        typemap[entity.entity_type].append(entity)
+    msg = list()
+    for typename, items in typemap.items():
+        msg.append(f"### {typename}\n")
+        for item in items:
+            mapping = item.asdict()
+            if 'apikey' in mapping:
+                msg.append(f"*Group: {mapping['apikey']}*\n")
+            else:
+                msg.append(f"*Entity: {mapping['device_id']}*\n")
+            msg.append(yaml.dump(item.asdict()))
+    print("\n".join(msg))
 
 
 async def main():
@@ -108,6 +135,7 @@ async def main():
     config = Config.must("SMART")
     print(attr.asdict(config))
     api = Api(url_keystone=config.url_keystone,
+              url_cb=config.url_cb,
               url_iotagent=config.url_iotagent,
               service=config.service,
               subservice=config.subservice,
@@ -131,7 +159,9 @@ async def main():
     logging.info("%d Entities loaded: %s", len(entities),
                  ",".join(e.device_id for e in entities))
 
-    if config.delete:
+    if config.markdown:
+        print_entities(groups, entities)
+    elif config.delete:
         await delete_entities(api, groups, entities)
     else:
         await create_entities(api, groups, entities)

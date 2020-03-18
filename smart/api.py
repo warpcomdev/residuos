@@ -1,36 +1,27 @@
 """API aggregator"""
 
+import json
 import logging
+import asyncio
 from typing import Sequence, Iterable, Mapping, Tuple, Optional, Any
 import attr
 import aiohttp
 from aiostream import stream, pipe
 
 from .error import FetchError
+from .factory import AttribList
 from .group import Group
 from .entity import Entity
 
 # Number of entities / groups created per request
 CHUNK_SIZE = 8
 
-try:
-    # pylint: disable=ungrouped-imports
-    from typing import Protocol
-
-    # pylint: disable=too-few-public-methods
-    class Asdict(Protocol):
-        """Protocol for items that have an asdict() method"""
-        def asdict(self) -> Mapping[str, Any]:
-            """Builds a dict from the attributes of the object"""
-except ImportError:
-    # pylint: disable=invalid-name
-    Asdict = Any
-
 
 @attr.s(auto_attribs=True)
 class Api:
     """Api manager for connecting to the IOTAgents"""
     url_keystone: str
+    url_cb: str
     url_iotagent: str
     service: str
     subservice: str
@@ -81,7 +72,7 @@ class Api:
     async def _create(self,
                       session: aiohttp.ClientSession,
                       kind: str,
-                      sequence: Iterable[Asdict],
+                      sequence: Iterable[AttribList],
                       chunk_size=CHUNK_SIZE):
         """Create the groups using the API"""
         assert self.token is not None
@@ -93,12 +84,16 @@ class Api:
             'Content-Type': 'application/json',
         }
 
-        async def create(sequence: Sequence[Asdict]):
+        async def create(sequence: Sequence[AttribList]):
             """Create a set of groups"""
             data = {kind: tuple(item.asdict() for item in sequence)}
+            keys = ", ".join(item.key() for item in sequence)
+            logging.debug("Creating %s keys %s", kind, keys)
             resp = await session.post(url, headers=headers, json=data)
             if resp.status != 201:
                 raise FetchError(url, resp, headers=headers, json=data)
+            logging.debug("%s keys %s created with code %d", kind, keys,
+                          resp.status)
 
         # pylint: disable=no-member
         await (stream.iterate(sequence)
@@ -131,9 +126,12 @@ class Api:
 
         async def delete(url: str, params: Mapping[str, Any]):
             """Delete a group given its apikey"""
+            logging.debug("Deleting entity with URL %s and Params %s", url,
+                          json.dumps(params))
             resp = await session.delete(url, headers=headers, params=params)
             if (resp.status < 200 or resp.status > 204) and resp.status != 404:
                 raise FetchError(url, resp, headers=headers, json=params)
+            logging.debug("Entity %s deleted with code %d", url, resp.status)
 
         # pylint: disable=no-member
         await (stream.iterate(items) | pipe.starmap(delete))
@@ -151,7 +149,10 @@ class Api:
     async def delete_entities(self, session: aiohttp.ClientSession,
                               entities: Sequence[Entity]):
         """Delete the groups using the API"""
-        pairs = ((f'{self.url_iotagent}/iot/devices/{entity.device_id}', {
+        iota = ((f'{self.url_iotagent}/iot/devices/{entity.device_id}', {
             'protocol': entity.protocol
         }) for entity in entities)
-        await self._delete(session, pairs)
+        cygnus = ((f'{self.url_cb}/v2/entities/{entity.device_id}', None)
+                  for entity in entities)
+        await asyncio.gather(self._delete(session, iota),
+                             self._delete(session, cygnus))
