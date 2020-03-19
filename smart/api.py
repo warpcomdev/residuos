@@ -205,6 +205,6 @@ class Api:
             'protocol': entity.protocol
         }) for entity in entities if entity.attributes)
         # And also from context broker
-        ctxb = ((f'{self.url_cb}/v2/entities/{entity.device_id}', None)
+        ctxb = ((f'{self.url_cb}/v2/entities/{entity.entity_name}', None)
                 for entity in entities)
         await gather(self._delete(session, iota), self._delete(session, ctxb))

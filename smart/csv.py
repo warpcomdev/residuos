@@ -148,7 +148,7 @@ class CSVIndex:
         # Get entity_id and device_id
         if self.entity_id is not None:
             entity_id = line[self.entity_id].strip() or None
-            if device_id is None:
+            if self.device_id is None:
                 device_id = entity_id
             else:
                 device_id = line[self.device_id].strip() or entity_id
