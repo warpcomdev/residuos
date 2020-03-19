@@ -142,22 +142,23 @@ async def main():
               username=config.username,
               password=config.password)
 
-    # Read all groups first
+    # Read groups and entities from files
     factory = Factory(dict())
     groups = list()
-    for fname in config.files():
-        logging.info("Reading groups from file: %s", fname)
-        groups.extend(Group.fromfile(factory, fname))
-    logging.info("%d Groups loaded: %s", len(groups),
-                 ", ".join(g.apikey for g in groups))
-
-    # Now, real all entities
     entities = list()
+
     for fname in config.files():
-        logging.info("Reading entities from file: %s", fname)
-        entities.extend(Entity.fromfile(factory, fname))
-    logging.info("%d Entities loaded: %s", len(entities),
-                 ",".join(e.device_id for e in entities))
+        logging.info("Reading groups from YAML file: %s", fname)
+        loaded = tuple(Group.fromyaml(factory, fname))
+        logging.info("%d Groups loaded: %s", len(loaded),
+                     ", ".join(g.apikey for g in loaded))
+        groups.extend(loaded)
+
+        logging.info("Reading entities from YAML file: %s", fname)
+        loaded = tuple(Entity.fromyaml(factory, fname))
+        logging.info("%d Entities loaded: %s", len(loaded),
+                     ",".join(e.device_id for e in loaded))
+        entities.extend(loaded)
 
     if config.markdown:
         print_entities(groups, entities)
