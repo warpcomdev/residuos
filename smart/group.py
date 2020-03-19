@@ -1,7 +1,6 @@
 """Device Group abstractions"""
 
 from typing import Sequence, Mapping, Any
-import yaml
 import attr
 
 from .factory import AttribList, Factory
@@ -39,15 +38,3 @@ class Group(AttribList):
             raise ParseError(err=err, obj=data)
         except TypeError as err:
             raise ParseError(err=err, obj=data)
-
-    @classmethod
-    def fromyaml(cls, factory: Factory, path: str):
-        """
-        Read a set of group objects from a file.
-        Adds all new groups to the "inherit" mapping, and
-        returns a list of groups.
-        """
-        with open(path, "r", encoding="utf-8") as infile:
-            return tuple(
-                Group.fromdict(factory, data)
-                for data in yaml.safe_load(infile).get('groups', list()))

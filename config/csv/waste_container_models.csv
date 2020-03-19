@@ -1,0 +1,2 @@
+entityType,entityID,brandName<Text>,modelName<Text>,madeOf<Text>,width<Number>,height<Number>,depth<Number>,maximumLoad<Number>,volumeStored<Number>
+wasteContainerModel,MODEL-001,molukas,test,plastic,2,1.5,1,0.95,2.85

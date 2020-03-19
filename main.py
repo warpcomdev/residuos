@@ -12,7 +12,7 @@ import attr
 import aiohttp
 import yaml
 
-from smart import AttribList, Group, Entity, Api, gather, Factory
+from smart import AttribList, Group, Entity, Api, gather, Factory, readfile
 
 
 @attr.s(auto_attribs=True)
@@ -26,6 +26,7 @@ class Config:
     subservice: str = "/Subservice path"
     username: str = "API User name"
     password: str = "API User password"
+    protocol: str = "Either IoTA-JSON or IoTA-UL, default proto for CSV entities"
     delete: bool = False
     markdown: bool = False
 
@@ -79,7 +80,9 @@ class Config:
             elif stat.S_ISDIR(mode):
                 for fname in os.listdir(path):
                     lower = fname.lower()
-                    if any(fname.endswith(ext) for ext in ('.yml', 'yaml')):
+                    if any(
+                            lower.endswith(ext)
+                            for ext in ('.yml', '.yaml', '.csv')):
                         yield os.path.join(path, fname)
             else:
                 raise ValueError(
@@ -108,7 +111,7 @@ async def delete_entities(api: Api, groups: Sequence[Group],
                      api.delete_entities(session, entities))
 
 
-def print_entities(groups: Sequence[Group], entities: Sequence[Entity]):
+def print_entities_md(groups: Sequence[Group], entities: Sequence[Entity]):
     """Print entities in markdown format"""
     typemap: Mapping[str, AttribList] = defaultdict(list)
     for group in groups:
@@ -148,20 +151,17 @@ async def main():
     entities = list()
 
     for fname in config.files():
-        logging.info("Reading groups from YAML file: %s", fname)
-        loaded = tuple(Group.fromyaml(factory, fname))
-        logging.info("%d Groups loaded: %s", len(loaded),
-                     ", ".join(g.apikey for g in loaded))
-        groups.extend(loaded)
-
-        logging.info("Reading entities from YAML file: %s", fname)
-        loaded = tuple(Entity.fromyaml(factory, fname))
-        logging.info("%d Entities loaded: %s", len(loaded),
-                     ",".join(e.device_id for e in loaded))
-        entities.extend(loaded)
+        logging.info("Reading groups and entities from file: %s", fname)
+        fgroups, fentities = readfile(factory, fname, config.protocol)
+        logging.info("%d Groups loaded: %s", len(fgroups),
+                     ", ".join(g.apikey for g in fgroups))
+        logging.info("%d Entities loaded: %s", len(fentities),
+                     ", ".join(e.device_id for e in fentities))
+        groups.extend(fgroups)
+        entities.extend(fentities)
 
     if config.markdown:
-        print_entities(groups, entities)
+        print_entities_md(groups, entities)
     elif config.delete:
         await delete_entities(api, groups, entities)
     else:

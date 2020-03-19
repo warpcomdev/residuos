@@ -6,3 +6,4 @@ from .factory import AttribList, Factory
 from .group import Group
 from .entity import Entity
 from .api import Api, gather
+from .formats import readfile
