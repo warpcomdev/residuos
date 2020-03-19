@@ -8,9 +8,9 @@ groups:
   - IoTA-JSON
   attributes:
   - name: areaServed
-    type: string
+    type: Text
   - name: category
-    type: array
+    type: Text
     # Possible values:
     #- fixed
     #- underground
@@ -18,19 +18,19 @@ groups:
     #- portable
     #- other
   - name: containerIsle
-    type: string
+    type: Text
   - name: description
-    type: string
+    type: Text
   - name: isleId
-    type: string
+    type: Text
   - name: location
-    type: "geo:point"
+    type: geo:json
   - name: refWasteContainerModel
-    type: string
+    type: RelationShip
   - name: serialNumber
-    type: string
+    type: Text
   - name: status
-    type: string
+    type: Text
     # Possible values:
     #- ok
     #- lidOpen
@@ -40,7 +40,7 @@ groups:
     #- burning
     #- unknown
   - name: storedWasteKind
-    type: string
+    type: Text
     # Possible values:
     #- organic
     #- inorganic
@@ -64,21 +64,21 @@ groups:
     #- agriculture
     #- other
   - name: dateLastEmptying
-    type: "date"
+    type: DateTime
   - name: dateUpdated
-    type: "date"
+    type: DateTime
   - name: dateNextActuation
-    type: "date"
+    type: DateTime
   - name: weight
-    type: float
+    type: Number
   - name: methaneConcentration
-    type: float
+    type: Number
   - name: fillingLevel
-    type: float
+    type: Number
     expression: "${(150 - @fillingLevel) / 150}"
     object_id: h
   - name: temperature
-    type: float
+    type: Number
     object_id: t
 
 # List of entities to create via the API
@@ -92,11 +92,15 @@ entities:
   - apikey: wc_molukas_containers_1.5m
     values:
       areaServed: "Calle test 1"
-      category: ['ground']
+      category: ground
       containerIsle: isla1
       description: Contenedor superficie de 1.5 metros
       isleId: isla1
-      location: 28.999880, -13.611424
+      location:
+        type: Point
+        coordinates:
+        - -13.611424
+        - 28.999880
       refWasteContainerModel: wcm_molukas_model_1
       serialNumber: 123456
       status: unknown
@@ -118,5 +122,9 @@ entities:
       areaServed: "Calle test 2"
       containerIsle: isla2
       isleId: isla2
-      location: 28.996589, -13.612841
+      location:
+        type: Point
+        coordinates:
+        - -13.612841
+        - 28.996589
       serialNumber: 654321

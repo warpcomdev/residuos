@@ -8,13 +8,13 @@ entities:
   protocol: IoTA-JSON
   attributes:
   - name: brandName
-    type: string
+    type: Text
     value: molukas
   - name: modelName
-    type: string
+    type: Text
     value: test
   - name: madeOf
-    type: string
+    type: Text
     value: plastic
     # Possible values:
     #- plastic
@@ -22,19 +22,18 @@ entities:
     #- metal
     #- other
   - name: width
-    type: float
+    type: Number
     value: 2
   - name: height
-    type: float
+    type: Number
     value: 1.5
   - name: depth
-    type: float
+    type: Number
     value: 1
   - name: maximumLoad
-    type: float
+    type: Number
     value: 0.95
   - name: volumeStored
-    type: float
+    type: Number
     #expression: "${@width*@height*@depth*@maximumLoad}"
     value: 2.85
-  

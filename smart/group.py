@@ -41,7 +41,7 @@ class Group(AttribList):
             raise ParseError(err=err, obj=data)
 
     @classmethod
-    def fromfile(cls, factory: Factory, path: str):
+    def fromyaml(cls, factory: Factory, path: str):
         """
         Read a set of group objects from a file.
         Adds all new groups to the "inherit" mapping, and
