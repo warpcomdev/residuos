@@ -8,6 +8,7 @@ import aiohttp
 from aiostream import stream, pipe, async_
 
 from .error import FetchError
+from .attrib import Attrib
 from .factory import AttribList
 from .group import Group
 from .entity import Entity
@@ -74,12 +75,9 @@ class Api:
         logging.debug("Authentication ok")
         self.token = resp.headers['X-Subject-Token']
 
-    async def _create(self,
-                      session: aiohttp.ClientSession,
-                      kind: str,
-                      sequence: Iterable[AttribList],
-                      chunk_size=CHUNK_SIZE):
-        """Create the groups using the API"""
+    async def _create_iota(self, session: aiohttp.ClientSession, kind: str,
+                           sequence: Iterable[AttribList]):
+        """Create a sequence of entities using the IoTA API"""
         assert self.token is not None
         url = f'{self.url_iotagent}/iot/{kind}'
         headers = {
@@ -89,35 +87,83 @@ class Api:
             'Content-Type': 'application/json',
         }
 
-        async def create(sequence: Sequence[AttribList]):
-            """Create a set of groups"""
-            data = {kind: tuple(item.asdict() for item in sequence)}
-            keys = ", ".join(item.key() for item in sequence)
-            logging.debug("Creating %s keys %s", kind, keys)
-            resp = await session.post(url, headers=headers, json=data)
-            if resp.status != 201:
-                raise FetchError(url, resp, headers=headers, json=data)
-            logging.debug("%s keys %s created with code %d", kind, keys,
-                          resp.status)
+        data = {kind: tuple(item.asdict() for item in sequence)}
+        keys = ", ".join(item.key() for item in sequence)
+        logging.debug("Creating IOTA %s keys %s", kind, keys)
+        resp = await session.post(url, headers=headers, json=data)
+        if resp.status != 201:
+            raise FetchError(url, resp, headers=headers, json=data)
+        logging.debug("IOTA %s keys %s created with code %d", kind, keys,
+                      resp.status)
 
-        # pylint: disable=no-member
-        await (stream.iterate(sequence)
-               | pipe.chunks(chunk_size)
-               | pipe.map(create))
+    async def _create_cb(self, session: aiohttp.ClientSession,
+                         sequence: Iterable[AttribList]):
+        """Create a sequence of entities using the CB API"""
+        assert self.token is not None
+        url = f'{self.url_cb}/v2/op/update'
+        headers = {
+            'Fiware-Service': self.service,
+            'Fiware-ServicePath': self.subservice,
+            'X-Auth-Token': self.token,
+            'Content-Type': 'application/json',
+        }
+
+        def cb_entity(attrib: Attrib) -> Mapping[str, Any]:
+            """Turns an attrib into an entity suitable for the CB"""
+            data = {
+                'id': attrib.device_id,
+                'type': attrib.entity_type,
+            }
+            for current in attrib.static_attributes:
+                data[current.name] = {
+                    'type': current.type,
+                    'value': current.value,
+                }
+            return data
+
+        data = {
+            'actionType': 'APPEND',
+            'entities': list(cb_entity(item) for item in sequence)
+        }
+        keys = ", ".join(item.key() for item in sequence)
+        logging.debug("Creating CB entities keys %s", keys)
+        resp = await session.post(url, headers=headers, json=data)
+        if resp.status != 204:
+            raise FetchError(url, resp, headers=headers, json=data)
+        logging.debug("CB entities keys %s created with code %d", keys, resp.status)
 
     async def create_groups(self,
                             session: aiohttp.ClientSession,
                             groups: Sequence[Group],
                             chunk_size=CHUNK_SIZE):
         """Create the groups using the API"""
-        await self._create(session, 'services', groups, chunk_size)
+        async def iota(groups: Sequence[Group]):
+            await self._create_iota(session, 'services', groups)
+
+        # pylint: disable=no-member
+        await (stream.iterate(groups) | pipe.chunks(chunk_size)
+               | pipe.map(iota))
 
     async def create_entities(self,
                               session: aiohttp.ClientSession,
                               entities: Sequence[Entity],
                               chunk_size=CHUNK_SIZE):
         """Create the groups using the API"""
-        await self._create(session, 'devices', entities, chunk_size)
+
+        # Only send to IOTA those entities that have at least one attribute
+        async def iota(entities: Sequence[Entity]):
+            await self._create_iota(session, 'devices', entities)
+
+        async def ctxb(entities: Sequence[Entity]):
+            await self._create_cb(session, entities)
+
+        # pylint: disable=no-member
+        await gather(
+            stream.iterate(entity for entity in entities if entity.attributes)
+            | pipe.chunks(chunk_size) | pipe.map(iota),
+            stream.iterate(entity
+                           for entity in entities if not entity.attributes)
+            | pipe.chunks(chunk_size) | pipe.map(ctxb))
 
     async def _delete(self, session: aiohttp.ClientSession,
                       items: Iterable[Tuple[str, Mapping[str, Any]]]):
@@ -157,7 +203,7 @@ class Api:
         # Delete from IOTA
         iota = ((f'{self.url_iotagent}/iot/devices/{entity.device_id}', {
             'protocol': entity.protocol
-        }) for entity in entities)
+        }) for entity in entities if entity.attributes)
         # And also from context broker
         ctxb = ((f'{self.url_cb}/v2/entities/{entity.device_id}', None)
                 for entity in entities)
