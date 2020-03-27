@@ -61,3 +61,30 @@ python3 main.py -d -c csv/waste_container_models.csv
 ```
 
 Borrar las entidades no tiene efectos sobre los datos retenidos en la base de datos, ni sobre las suscripciones, de manera que actualmente no se considera un problema.
+
+## Datos
+
+Los datos se pueden enviar mediante MQTT. Es necesario tener:
+
+- La dirección IP y puerto del servidor MQTT.
+- Usuario y password MQTT.
+- Cadena de certificados del servidor MQTT.
+- API key y Device ID del dispositivo a simular.
+
+Las direcciones y credenciales deben obtenerse del proveedor. Para obtener la cadena de certificados, se han añadido unas instrucciones en la carpeta [certs](./certs/README.md)
+
+Ejemplo de envío de datos:
+
+```
+# Datos de conexión a MQTT
+MQTT_IP=...
+MQTT_PORT=...
+MQTT_USER=...
+MQTT_PASS=...
+
+# apiKey y deviceID
+APIKEY=...
+DEVICEID=...
+
+mosquitto_pub -d --cafile certs/smc.pem --insecure -h "$MQTT_IP" -p "$MQTT_PORT" -u "$MQTT_USER" -P "$MQTT_PASS" -t "/$APIKEY/$DEVICEID/attrs" -m '{"t":16,"f":25}'
+```

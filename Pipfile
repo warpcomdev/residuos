@@ -1,0 +1,20 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+yapf = "*"
+pylint = "*"
+mypy = "*"
+rope = "*"
+
+[packages]
+configargparse = "*"
+attrs = "*"
+aiohttp = {extras = ["speedups"],version = "*"}
+pyyaml = "*"
+aiostream = "*"
+
+[requires]
+python_version = "3.6"
