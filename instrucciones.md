@@ -11,7 +11,7 @@ El primer paso es dar de alta los contenedores de residuos en la plataforma. Par
 Para dar de alta los contenedores, es necesario **[Descargar ese CSV desde aquí](https://raw.githubusercontent.com/warpcomdev/residuos/master/config/csv/waste_containers.csv) y rellenar las siguientes columnas, desde la fila 3 en adelante**:
 
 - entityID: Esto es informativo, para identificar el contenedor en la plataforma. Se puede usar CONTAINER-001, CONTAINER-002, etc.
-- deviceID: Este es el ID del sensor instalado en el container. Debe coincidir con el ID que se use en el tópic MQTT. Ver sección **Envío de datos**.
+- deviceID: Este es el ID del sensor instalado en el container. Debe coincidir con el ID que se use en el tópic MQTT. Ver sección [Envío de datos](#envío-de-datos).
 - protocol: Poner **IoTA-JSON**.
 - f:fillingLevel: Esto es una fórmula para calcular el nivel de llenado del contenedor (de 0.00: vacío a 1.00: lleno), en función de la información que manda el sensor (distancia, en centímetros). Para el piloto proponemos usar una fórmula sencilla, considerando por ejemplo que el contenedor tiene 1,50 metros de altura interior. Poner **${(150-@fillingLevel)/150}**.
 - t:temperature: Dejar en blanco, esta información se enviará por MQTT.
@@ -35,7 +35,7 @@ Como es simplemente un piloto, si hay datos desconocidos (por ejemplo *isleId*),
 
 Una vez se haya rellenado el CSV y creado las entidades, se pueden empezar a enviar datos por MQTT.
 
-Cada dispositivo debe tener un ID único, que se habrá indicado en la columna **deviceID** del CSV anterior. Los datos que se envíen al broker MQTT deben tener el siguiente formato:
+Cada dispositivo debe tener un ID único, que se habrá indicado en la columna **deviceID** [del CSV anterior](#alta-de-contenedores). Los datos que se envíen al broker MQTT deben tener el siguiente formato:
 
 - topic: /**apiKey**/**deviceID**/attrs
 - payload: {"f":*XX*, "t":*YY*}
