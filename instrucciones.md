@@ -6,7 +6,7 @@ Para la integración del piloto de residuos, se procederá de la siguiente maner
 
 El primer paso es dar de alta los contenedores de residuos en la plataforma. Para este piloto se consideran en principio dos contenedores, que se corresponden con las filas 3 y sucesivas de este CSV:
 
-- [waste_container.csv](config/csv/waste_container.csv)
+- [waste_containers.csv](config/csv/waste_containers.csv)
 
 Para dar de alta los contenedores, es necesario rellenar las siguientes columnas:
 
