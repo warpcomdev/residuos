@@ -8,7 +8,7 @@ El primer paso es dar de alta los contenedores de residuos en la plataforma. Par
 
 - [waste_containers.csv](config/csv/waste_containers.csv)
 
-Para dar de alta los contenedores, es necesario rellenar las siguientes columnas:
+Para dar de alta los contenedores, es necesario **[Descargar ese CSV desde aquí](https://raw.githubusercontent.com/warpcomdev/residuos/master/config/csv/waste_containers.csv) y rellenar las siguientes columnas**:
 
 - entityID: Esto es informativo, para identificar el contenedor en la plataforma. Se puede usar CONTAINER-001, CONTAINER-002, etc.
 - deviceID: Este es el ID del sensor instalado en el container. Debe coincidir con el ID que se use en el tópic MQTT. Ver sección **Envío de datos**.
