@@ -20,8 +20,8 @@ Tras discutir estas diferencias con los desarrolladores de plataforma, acordamos
 
 Las entidades a crear se han definido mediante ficheros CSV:
 
-- [waste_container_models.csv](./csv/waste_container_models.csv): Modelos de contenedores de residuos.
-- [waste_containers.csv](./csv/waste_containers.csv): Contenedores dados de alta.
+- [waste_container_models.csv](csv/waste_container_models.csv): Modelos de contenedores de residuos.
+- [waste_containers.csv](csv/waste_containers.csv): Contenedores dados de alta.
 
 La cabecera de cada fichero csv define los **atributos** de las diferentes entidades, además del **tipo** y **object_id** (opcional) de cada atributo, usando este formato: *object_id*:*atributo*<*tipo*>, por ejemplo: `t:temperature<Number>`.
 
@@ -71,7 +71,7 @@ Los datos se pueden enviar mediante MQTT. Es necesario tener:
 - Cadena de certificados del servidor MQTT.
 - API key y Device ID del dispositivo a simular.
 
-Las direcciones y credenciales deben obtenerse del proveedor. Para obtener la cadena de certificados, se han añadido unas instrucciones en la carpeta [certs](./certs/README.md)
+Las direcciones y credenciales deben obtenerse del proveedor. Para obtener la cadena de certificados, se han añadido unas instrucciones en la carpeta [certs](certs/README.md)
 
 Ejemplo de envío de datos:
 

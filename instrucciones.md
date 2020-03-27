@@ -6,7 +6,7 @@ Para la integración del piloto de residuos, se procederá de la siguiente maner
 
 El primer paso es dar de alta los contenedores de residuos en la plataforma. Para este piloto se consideran en principio dos contenedores, que se corresponden con las filas 3 y sucesivas de este CSV:
 
-- [waste_container.csv](./config/csv/waste_container.csv)
+- [waste_container.csv](config/csv/waste_container.csv)
 
 Para dar de alta los contenedores, es necesario rellenar las siguientes columnas:
 
@@ -23,7 +23,7 @@ Para dar de alta los contenedores, es necesario rellenar las siguientes columnas
 - isleId: ID del bloque o isleta al que pertenece el contenedor.
 - location: Coordenadas del contenedor, en formato geo:json (por ejemplo: *{"type":"Point","coordinates":[-3.637209535,40.538009667]}*)
 - methaneConcentration: Este valor lo soporta la vertical pero no el sensor, así que se puede dejar a 0.
-- refWasteContainerModel: Referencia a algún modelo de contenedor definido en el fichero [waste_container_models.csv](./config/csv/waste_container_models.csv). Para este piloto se define un sólo modelo, *MODEL-001*.
+- refWasteContainerModel: Referencia a algún modelo de contenedor definido en el fichero [waste_container_models.csv](config/csv/waste_container_models.csv). Para este piloto se define un sólo modelo, *MODEL-001*.
 - serialNumber: Número de serie del contenedor.
 - status: Estado del contenedor, dejar con el valor **.
 - storedWasteKind: Tipo de residuos. Valores soportados: *organic*, *inorganic*, *glass*, *oil*, *plastic*, *metal*, *paper*, *batteries*, *electronics*, *hazardous*, *other*
