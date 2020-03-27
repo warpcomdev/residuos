@@ -25,7 +25,7 @@ Para dar de alta los contenedores, es necesario rellenar las siguientes columnas
 - methaneConcentration: Este valor lo soporta la vertical pero no el sensor, así que se puede dejar a 0.
 - refWasteContainerModel: Referencia a algún modelo de contenedor definido en el fichero [waste_container_models.csv](config/csv/waste_container_models.csv). Para este piloto se define un sólo modelo, *MODEL-001*.
 - serialNumber: Número de serie del contenedor.
-- status: Estado del contenedor, dejar con el valor **.
+- status: Estado del contenedor, dejar con el valor *ok*.
 - storedWasteKind: Tipo de residuos. Valores soportados: *organic*, *inorganic*, *glass*, *oil*, *plastic*, *metal*, *paper*, *batteries*, *electronics*, *hazardous*, *other*
 - storedWasteOrigin: Origen de los residuos. Valores soportados: *household*, *municipal*, *industrial*, *construction*, *hostelry*, *agriculture*, *other*
 
