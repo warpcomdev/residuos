@@ -39,7 +39,7 @@ Cada dispositivo debe tener un ID único, que se habrá indicado en la columna *
 
 - topic: /**apiKey**/**deviceID**/attrs
 - payload: {"f":*XX*, "t":*YY*}
-  - *XX* es la distancia medida por el sensor de llenado, en centrímetros.
+  - *XX* es la distancia medida por el sensor de llenado, en centímetros.
   - "YY" es la temperatura medida por el sensor de temperatura, en grados.
 
 El valor de **apiKey**, así como la dirección IP del broker MQTT, y las credenciales de acceso al broker (nombre de usuario y contraseña), se enviarán por correo.
