@@ -1,10 +1,13 @@
 """CSV module reads entities and groups from a CSV file"""
 
 import logging
+from typing import (Optional, Mapping, Callable, Sequence, Union, Generator, Type, Any)
 import csv
-from typing import Optional, Mapping, Callable, Any, Sequence
 import json
 import attr
+
+from .group import Group
+from .entity import Entity
 
 
 @attr.s(auto_attribs=True)
@@ -34,7 +37,7 @@ class AttribIndex:
         """
         name, entity_type, object_id = header.strip(), "Text", None
         # No-Op cast
-        cast = lambda text: text
+        cast: Callable[[Any], Any] = lambda text: text
         if "<" in header:
             name, entity_type = header.split("<")
             name = name.strip()
@@ -84,7 +87,7 @@ class AttribIndex:
 class CSVIndex:
     """
     Relates column numbers with all the relevant fields to parse:
-    entity_type, entity_id, device_idm apikey and attributes.
+    entity_type, entity_id, device_id, apikey and attributes.
     """
     entity_type: int
     default_proto: str
@@ -127,6 +130,8 @@ class CSVIndex:
         if entity_id is None and apikey is None:
             raise ValueError(
                 "At least one of entityID or apiKey columns must be defined")
+        if entity_type is None:
+            raise ValueError("EntityType must be set")
         return cls(entity_type=entity_type,
                    default_proto=default_proto,
                    entity_id=entity_id,
@@ -135,75 +140,75 @@ class CSVIndex:
                    protocol=protocol,
                    attribs=attribs)
 
-    # pylint: disable=too-many-branches
-    def readline(self, line: Sequence[str]):
-        """
-        Turn the CSV line into a dictionary object suitable
-        for the Group or Entity .fromdict() function
-        """
-        entity_type = line[self.entity_type].strip() or None
+    def readline(self, line: Sequence[str]) -> Union[Group, Entity]:
+        """Turn the CSV line into a either a Group or an Entity"""
+
+        # Get entity_id and device_id
+        def get(line, index, default=None):
+            return (line[index].strip()
+                    if index is not None else None) or default
+
+        entity_type = get(line, self.entity_type, None)
+        entity_id = get(line, self.entity_id, None)
+        device_id = get(line, self.device_id, entity_id)
+        apikey = get(line, self.apikey, None)
+        protocol = get(line, self.protocol, self.default_proto)
+
         if entity_type is None:
             raise ValueError("entityType value must not be empty")
-        entity_id, device_id, apikey = None, None, None
-        # Get entity_id and device_id
-        if self.entity_id is not None:
-            entity_id = line[self.entity_id].strip() or None
-            if self.device_id is None:
-                device_id = entity_id
-            else:
-                device_id = line[self.device_id].strip() or entity_id
-        # Get apikey
-        if self.apikey is not None:
-            apikey = line[self.apikey].strip() or None
-        # Check at least one (and at most one) of entity_id or apikey
-        # are provided
         if entity_id is None and apikey is None:
             raise ValueError(
                 "At least one of entityID or apiKey values must be defined")
         if entity_id is not None and apikey is not None:
             raise ValueError(
                 "Only one of entity_id or apikey must have a value")
-        # Get the protocol
-        protocol = None
-        if self.protocol is None:
-            protocol = self.default_proto
-        else:
-            protocol = line[self.protocol].strip() or self.default_proto
+
+        # Build the attributes
+        attributes = list()
+        for attrib in self.attribs:
+            item = attrib(
+                line[attrib.column]) if attrib.column < len(line) else None
+            if item is not None:
+                attributes.append(item)
+
         # Build the dict
-        data = {'entity_type': entity_type}
+        kls: Union[Type[Group], Type[Entity]] = Group
+        data = {
+            'entity_type': entity_type,
+            'attributes': attributes
+        }
         if entity_id is not None:
+            kls = Entity
             data['device_id'] = device_id
             data['entity_name'] = entity_id
             data['protocol'] = protocol
         else:
-            data['apikey'] = apikey
             # For a group, protocol should be a list
-            if "[" in protocol:
-                data['protocol'] = json.loads(protocol)
-            else:
-                data['protocol'] = (protocol, )
-        # Build the attributes
-        attributes = list()
-        for attrib in self.attribs:
-            item = attrib(line[attrib.column])
-            if item is not None:
-                attributes.append(item)
-        data['attributes'] = attributes
-        return data
+            protocol = json.loads(protocol) if "[" in protocol else (
+                protocol, )
+            data['apikey'] = apikey
+            data['protocol'] = protocol
+        return kls.fromdict(data)
 
-    @classmethod
-    def readfile(cls, protocol: str, path: str):
-        """Yields groups and entities in CSV file"""
-        with open(path, "r", encoding='utf-8') as infile:
-            csv_reader = csv.reader(infile, delimiter=',')
-            csv_index = None
-            for line, row in enumerate(csv_reader):
-                try:
-                    if csv_index is None:
-                        csv_index = cls.fromheader(protocol, row)
-                    elif any(cell.strip() != "" for cell in row):
-                        yield csv_index.readline(row)
-                except ValueError as err:
-                    logging.error("File %s failed to load at row %d: %s", path,
-                                  line + 1, ",".join(row))
-                    raise
+
+def readfile(protocol: str,
+             path: str) -> Generator[Union[Group, Entity], None, None]:
+    """Yields groups and entities in CSV file"""
+    lower = path.lower()
+    if not any(lower.endswith(ext) for ext in ('.csv', )):
+        return
+    with open(path, "r", encoding='utf-8') as infile:
+        csv_reader = csv.reader(infile, delimiter=',')
+        csv_lines = enumerate(csv_reader, 1)
+        try:
+            line, header = next(csv_lines)
+            csv_index = CSVIndex.fromheader(protocol, header)
+            for line, row in csv_lines:
+                if any(cell.strip() != "" for cell in row):
+                    yield csv_index.readline(row)
+        except StopIteration:
+            return
+        except ValueError as err:
+            logging.error("File %s failed to load at row %d: %s (%s)", path,
+                          line, ",".join(row), err)
+            raise

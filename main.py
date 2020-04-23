@@ -12,7 +12,7 @@ import attr
 import aiohttp
 import yaml
 
-from smart import AttribList, Group, Entity, Api, gather, Factory, readfile
+from smart import AttribList, Group, Entity, Api, Pool, readfile
 
 
 @attr.s(auto_attribs=True)
@@ -96,8 +96,11 @@ async def create_entities(api: Api, groups: Sequence[Group],
             verify_ssl=False)) as session:
         await api.auth(session)
         logging.info("Creating objects")
-        await gather(api.create_groups(session, groups),
-                     api.create_entities(session, entities))
+        pool = Pool(session)
+        await asyncio.gather(
+            pool.chunked(api.create_groups, groups),
+            pool.chunked(api.create_entities, entities)
+        )
 
 
 async def delete_entities(api: Api, groups: Sequence[Group],
@@ -107,13 +110,16 @@ async def delete_entities(api: Api, groups: Sequence[Group],
             verify_ssl=False)) as session:
         await api.auth(session)
         logging.info("Deleting objects")
-        await gather(api.delete_groups(session, groups),
-                     api.delete_entities(session, entities))
+        pool = Pool(session)
+        await asyncio.gather(
+            pool.serial(api.delete_group, groups),
+            pool.serial(api.delete_entity, entities)
+        )
 
 
 def print_entities_md(groups: Sequence[Group], entities: Sequence[Entity]):
     """Print entities in markdown format"""
-    typemap: Mapping[str, AttribList] = defaultdict(list)
+    typemap: Mapping[str, list] = defaultdict(list)
     for group in groups:
         typemap[group.entity_type].append(group)
     for entity in entities:
@@ -146,13 +152,17 @@ async def main():
               password=config.password)
 
     # Read groups and entities from files
-    factory = Factory(dict())
     groups = list()
     entities = list()
 
     for fname in config.files():
         logging.info("Reading groups and entities from file: %s", fname)
-        fgroups, fentities = readfile(factory, fname, config.protocol)
+        fgroups, fentities = list(), list()
+        for item in readfile(config.protocol, fname):
+            if hasattr(item, 'apikey'):
+                fgroups.append(item)
+            else:
+                fentities.append(item)
         logging.info("%d Groups loaded: %s", len(fgroups),
                      ", ".join(g.apikey for g in fgroups))
         logging.info("%d Entities loaded: %s", len(fentities),

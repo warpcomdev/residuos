@@ -1,7 +1,7 @@
 """Device / Group Attribute"""
 
-import itertools
-from typing import Optional, Mapping, Any
+from itertools import chain, filterfalse
+from typing import Optional, Mapping, Sequence, Iterator, Any
 import attr
 
 from .error import ParseError
@@ -15,10 +15,10 @@ class Attrib:
     Attributes have the following properties:
     - name: Name of the attribute.
     - type: string, date, integer, float, array, geo:point ...
-    - value: For static attributes, value.
-    - expression: For auto-calculated attributes, expression.
-    - object_id: alias for the attribute, as received via HTTP or MQTT.
-    - entity_name, entity_type: in case you need to split
+    - value: A fixed value for static attributes.
+    - expression: An expression for auto-calculated attributes.
+    - object_id: Alias for the attribute, as received via HTTP or MQTT.
+    - entity_name, entity_type: In case you need to split
       a measure in several entities.
     """
     name: str
@@ -42,16 +42,37 @@ class Attrib:
         """Clone item"""
         return cls.fromdict(attr.asdict(item))
 
-    @staticmethod
-    def chain(*arg):
-        """
-        Chain several (possibly None) sequences of Attribs.
-        Chaining is done in reversed order, i.e attributes from later
-        sequences override attributes from former sequences.
-        """
-        visited = set()
-        for attrib in itertools.chain(*(item for item in reversed(arg)
-                                        if item is not None)):
-            if attrib.name not in visited:
-                visited.add(attrib.name)
-                yield attrib
+
+@attr.s(auto_attribs=True)
+class AttribList:
+    """List of attributes with attached entity type"""
+    entity_type: str
+    static_attributes: Optional[Sequence[Attrib]] = None
+    attributes: Optional[Sequence[Attrib]] = None
+
+    def attribs(self) -> Iterator[Attrib]:
+        """Chains static and dynamic attribs"""
+        return chain(*(seq for seq in (self.static_attributes, self.attributes)
+                       if seq is not None))
+
+    def asdict(self) -> Mapping[str, Any]:
+        """Return only non-null attributes in dict"""
+        return attr.asdict(self,
+                           recurse=True,
+                           filter=(lambda attr, v: v is not None))
+
+    def key(self) -> str:
+        """Key of this object. Implemented by subclasses."""
+        raise NotImplementedError("key not implemented in AttribList")
+
+    @classmethod
+    def fromdict(cls, data: Mapping[str, Any]):
+        """Build AttrList from entity_type and list of attribs"""
+        attribs = tuple(
+            Attrib.fromdict(item) for item in data.get('attributes', tuple()))
+        val_none = lambda attrib: attrib.value is None
+        regular = tuple(filter(val_none, attribs))
+        statics = tuple(filterfalse(val_none, attribs))
+        return cls(entity_type=data['entity_type'],
+                   static_attributes=statics or None,
+                   attributes=regular or None)

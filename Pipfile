@@ -14,7 +14,6 @@ configargparse = "*"
 attrs = "*"
 aiohttp = {extras = ["speedups"],version = "*"}
 pyyaml = "*"
-aiostream = "*"
 
 [requires]
 python_version = "3.6"

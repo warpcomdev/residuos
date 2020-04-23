@@ -1,26 +1,17 @@
 """API aggregator"""
 
-import json
 import logging
-from typing import Sequence, Iterable, Mapping, Tuple, Optional, Any
-import attr
+import json
+import asyncio
+from typing import Iterable, Mapping, Dict, Optional, Any
+
 import aiohttp
-from aiostream import stream, pipe, async_
+import attr
 
 from .error import FetchError
-from .attrib import Attrib
-from .factory import AttribList
+from .attrib import Attrib, AttribList
 from .group import Group
 from .entity import Entity
-
-# Number of entities / groups created per request
-CHUNK_SIZE = 8
-
-
-async def gather(*awaitables):
-    """Portable version of asyncio.gather based on aiostream"""
-    #pylint: disable=no-member
-    await (stream.iterate(awaitables) | pipe.map(async_(lambda task: task)))
 
 
 @attr.s(auto_attribs=True)
@@ -96,8 +87,12 @@ class Api:
         logging.debug("IOTA %s keys %s created with code %d", kind, keys,
                       resp.status)
 
-    async def _create_cb(self, session: aiohttp.ClientSession,
-                         sequence: Iterable[AttribList]):
+    async def _create_devices(self, session: aiohttp.ClientSession,
+                              sequence: Iterable[Entity]):
+        return await self._create_iota(session, 'devices', sequence)
+
+    async def _create_entities(self, session: aiohttp.ClientSession,
+                               sequence: Iterable[Entity]):
         """Create a sequence of entities using the CB API"""
         assert self.token is not None
         url = f'{self.url_cb}/v2/op/update'
@@ -108,9 +103,11 @@ class Api:
             'Content-Type': 'application/json',
         }
 
-        def cb_entity(attrib: Attrib) -> Mapping[str, Any]:
+        def cb_entity(attrib: Entity) -> Optional[Mapping[str, Any]]:
             """Turns an attrib into an entity suitable for the CB"""
-            data = {
+            if not attrib.static_attributes:
+                return None
+            data: Dict[str, Any] = {
                 'id': attrib.device_id,
                 'type': attrib.entity_type,
             }
@@ -121,90 +118,76 @@ class Api:
                 }
             return data
 
-        data = {
-            'actionType': 'APPEND',
-            'entities': list(cb_entity(item) for item in sequence)
-        }
-        keys = ", ".join(item.key() for item in sequence)
+        ents = tuple(cb_entity(item) for item in sequence)
+        ents = tuple(ent for ent in ents if ent is not None)
+        if len(ents) <= 0:
+            logging.debug("No entities to create")
+            return
+
+        data = {'actionType': 'APPEND', 'entities': ents}
+        keys = ", ".join(item['id'] if item is not None else '' for item in ents)
         logging.debug("Creating CB entities keys %s", keys)
+
         resp = await session.post(url, headers=headers, json=data)
         if resp.status != 204:
             raise FetchError(url, resp, headers=headers, json=data)
-        logging.debug("CB entities keys %s created with code %d", keys, resp.status)
+        logging.debug("CB entities keys %s created with code %d", keys,
+                      resp.status)
 
-    async def create_groups(self,
-                            session: aiohttp.ClientSession,
-                            groups: Sequence[Group],
-                            chunk_size=CHUNK_SIZE):
-        """Create the groups using the API"""
-        async def iota(groups: Sequence[Group]):
-            await self._create_iota(session, 'services', groups)
+    async def create_entities(self, session: aiohttp.ClientSession,
+                              entities: Iterable[Entity]):
+        """Create IOTA / CB Entities"""
+        await asyncio.gather(
+            # Only send to IOTA those entities that have at least one attribute
+            self._create_devices(
+                session, (entity for entity in entities if entity.attributes)),
+            self._create_entities(
+                session,
+                (entity for entity in entities if not entity.attributes)))
 
-        # pylint: disable=no-member
-        await (stream.iterate(groups) | pipe.chunks(chunk_size)
-               | pipe.map(iota))
+    async def create_groups(self, session: aiohttp.ClientSession,
+                            sequence: Iterable[Group]):
+        """Create IOTA groups"""
+        return await self._create_iota(session, 'services', sequence)
 
-    async def create_entities(self,
-                              session: aiohttp.ClientSession,
-                              entities: Sequence[Entity],
-                              chunk_size=CHUNK_SIZE):
-        """Create the groups using the API"""
-
-        # Only send to IOTA those entities that have at least one attribute
-        async def iota(entities: Sequence[Entity]):
-            await self._create_iota(session, 'devices', entities)
-
-        async def ctxb(entities: Sequence[Entity]):
-            await self._create_cb(session, entities)
-
-        # pylint: disable=no-member
-        await gather(
-            stream.iterate(entity for entity in entities if entity.attributes)
-            | pipe.chunks(chunk_size) | pipe.map(iota),
-            stream.iterate(entity
-                           for entity in entities if not entity.attributes)
-            | pipe.chunks(chunk_size) | pipe.map(ctxb))
-
-    async def _delete(self, session: aiohttp.ClientSession,
-                      items: Iterable[Tuple[str, Mapping[str, Any]]]):
-        """Delete the groups using the API"""
+    async def _delete(self, session: aiohttp.ClientSession, url: str,
+                      params: Optional[Mapping[str, Any]]):
+        """Delete the group using the API"""
         assert self.token is not None
         headers = {
             'Fiware-Service': self.service,
             'Fiware-ServicePath': self.subservice,
             'X-Auth-Token': self.token,
         }
+        logging.debug("Deleting entity with URL %s and Params %s", url,
+                      json.dumps(params))
+        resp = await session.delete(url, headers=headers, params=params)
+        if (resp.status < 200 or resp.status > 204) and resp.status != 404:
+            raise FetchError(url, resp, headers=headers, json=params)
+        logging.debug("Entity %s deleted with code %d", url, resp.status)
 
-        async def delete(url: str, params: Mapping[str, Any]):
-            """Delete a group given its apikey"""
-            logging.debug("Deleting entity with URL %s and Params %s", url,
-                          json.dumps(params))
-            resp = await session.delete(url, headers=headers, params=params)
-            if (resp.status < 200 or resp.status > 204) and resp.status != 404:
-                raise FetchError(url, resp, headers=headers, json=params)
-            logging.debug("Entity %s deleted with code %d", url, resp.status)
+    async def delete_entity(self, session: aiohttp.ClientSession,
+                            entity: Entity):
+        """Delete the entity using the API"""
+        tasks = list()
+        # Delete from IOTA
+        if entity.attributes:
+            tasks.append(
+                self._delete(
+                    session,
+                    f'{self.url_iotagent}/iot/devices/{entity.device_id}',
+                    {'protocol': entity.protocol}))
+        # And also from context broker
+        tasks.append(
+            self._delete(session,
+                         f'{self.url_cb}/v2/entities/{entity.entity_name}',
+                         None))
+        await asyncio.gather(*tasks)
 
-        # pylint: disable=no-member
-        await (stream.iterate(items) | pipe.starmap(delete))
-
-    async def delete_groups(self, session: aiohttp.ClientSession,
-                            groups: Sequence[Group]):
-        """Delete the groups using the API"""
+    async def delete_group(self, session: aiohttp.ClientSession, group: Group):
+        """Delete the group using the API"""
         url = f'{self.url_iotagent}/iot/services'
-        pairs = ((url, {
+        await asyncio.gather(*(self._delete(session, url, {
             'apikey': group.apikey,
             'protocol': protocol
-        }) for group in groups for protocol in group.protocol)
-        await self._delete(session, pairs)
-
-    async def delete_entities(self, session: aiohttp.ClientSession,
-                              entities: Sequence[Entity]):
-        """Delete the groups using the API"""
-        # Delete from IOTA
-        iota = ((f'{self.url_iotagent}/iot/devices/{entity.device_id}', {
-            'protocol': entity.protocol
-        }) for entity in entities if entity.attributes)
-        # And also from context broker
-        ctxb = ((f'{self.url_cb}/v2/entities/{entity.entity_name}', None)
-                for entity in entities)
-        await gather(self._delete(session, iota), self._delete(session, ctxb))
+        }) for protocol in group.protocol))
