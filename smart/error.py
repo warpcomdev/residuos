@@ -18,4 +18,5 @@ class FetchError(Exception):
     url: str
     resp: aiohttp.ClientResponse
     headers: Optional[Mapping[str, str]] = None
-    json: Optional[Mapping[str, Any]] = None
+    body: Optional[Mapping[str, Any]] = None
+    params: Optional[Mapping[str, Any]] = None

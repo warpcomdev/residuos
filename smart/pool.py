@@ -1,9 +1,10 @@
 """API aggregator"""
 
 import asyncio
-import logging
-from typing import Callable, Awaitable, Iterable, TypeVar
+from typing import Callable, Awaitable, Iterable, Sequence, TypeVar
 import aiohttp
+
+from .api import gather
 
 # Default pool and chunk size
 CHUNK_SIZE = 8
@@ -22,45 +23,40 @@ class Pool:
         self._chunk_size = chunk_size
         self._pool_size = pool_size
 
-    async def _consume(self, queue: asyncio.Queue, exc: asyncio.Queue, task):
+    async def _consume(self, queue: asyncio.Queue, task):
         """Consume a coroutine from the queue"""
         while True:
             item = await queue.get()
             if item is None:
                 # pass on the word that we're done, and exit
                 await queue.put(None)
-                break
+                return None
             try:
                 await task(self._session, item)
             # pylint: disable=broad-except
             except Exception as err:
                 # abort
                 await queue.put(None)
-                await exc.put(err)
+                return err
 
-    async def serial(self, task: Callable[[aiohttp.ClientSession, T],
-                                          Awaitable[None]],
-                     items: Iterable[T]):
-        """Call the coroutine once per item"""
+    async def amap(self, task: Callable[[aiohttp.ClientSession, T],
+                                        Awaitable[None]], items: Iterable[T]):
+        """Asynchronously map the coroutine once per item"""
         queue: asyncio.Queue = asyncio.Queue()
-        exc: asyncio.Queue = asyncio.Queue()
         tasks = [
-            asyncio.ensure_future(self._consume(queue, exc, task))
+            asyncio.ensure_future(self._consume(queue, task))
             for _ in range(self._pool_size)
         ]
         for item in items:
             if item is not None:
                 await queue.put(item)
         await queue.put(None)
-        await asyncio.gather(*tasks)
-        if not exc.empty():
-            raise await exc.get()
+        await gather(*tasks)
 
-    async def chunked(self,
-                      task: Callable[[aiohttp.ClientSession, Iterable[T]],
-                                     Awaitable[None]], items: Iterable[T]):
-        """Call the coroutine once per chunk"""
+    async def batch(self, task: Callable[[aiohttp.ClientSession, Sequence[T]],
+                                         Awaitable[None]], items: Iterable[T]):
+        """Map the coroutine on batches of Call the coroutine once per chunk"""
         csize = self._chunk_size
         fixed = tuple(items)
         chunk = (fixed[n:n + csize] for n in range(0, len(fixed), csize))
-        await self.serial(task, chunk)
+        await self.amap(task, chunk)

@@ -1,17 +1,32 @@
 """API aggregator"""
 
 import logging
-import json
 import asyncio
-from typing import Iterable, Mapping, Dict, Optional, Any
+from typing import (Mapping, Dict, Sequence, Optional, Iterable, Awaitable,
+                    Any)
 
 import aiohttp
 import attr
 
-from .error import FetchError
-from .attrib import Attrib, AttribList
+from .request import Request
+from .attrib import AttribList
 from .group import Group
 from .entity import Entity
+
+
+async def gather(*awaitables: Awaitable):
+    """
+    Gather awaitables that return None.
+    If any of the awaitables raises an exception, logs it.
+    Raises the last exception to arrive.
+    """
+    last_err = None
+    for err in await asyncio.gather(*awaitables, return_exceptions=True):
+        if err is not None:
+            last_err = err
+            logging.error(err)
+    if last_err is not None:
+        raise last_err
 
 
 @attr.s(auto_attribs=True)
@@ -32,9 +47,18 @@ class Api:
             "Api object created: %s",
             attr.asdict(self, filter=(lambda a, v: a.name != "password")))
 
+    def _headers(self):
+        """Return headers"""
+        headers = {
+            'Fiware-Service': self.service,
+            'Fiware-ServicePath': self.subservice,
+        }
+        if self.token is not None:
+            headers['X-Auth-Token'] = self.token
+        return headers
+
     async def auth(self, session: aiohttp.ClientSession):
         """Get an authentication token"""
-        logging.debug("Getting authentication token")
         request = {
             "auth": {
                 "scope": {
@@ -59,52 +83,36 @@ class Api:
                 }
             }
         }
-        url = f'{self.url_keystone}/v3/auth/tokens'
-        resp = await session.post(url, json=request)
-        if resp.status < 200 or resp.status > 204:
-            raise FetchError(url, resp, json=request)
-        logging.debug("Authentication ok")
+
+        resp = await Request(
+            session=session,
+            title="Get authentication token",
+            url=f'{self.url_keystone}/v3/auth/tokens',
+            headers=self._headers(),
+            body=request).post(lambda status: 200 <= status <= 204)
         self.token = resp.headers['X-Subject-Token']
 
     async def _create_iota(self, session: aiohttp.ClientSession, kind: str,
-                           sequence: Iterable[AttribList]):
+                           sequence: Sequence[AttribList]):
         """Create a sequence of entities using the IoTA API"""
-        assert self.token is not None
-        url = f'{self.url_iotagent}/iot/{kind}'
-        headers = {
-            'Fiware-Service': self.service,
-            'Fiware-ServicePath': self.subservice,
-            'X-Auth-Token': self.token,
-            'Content-Type': 'application/json',
-        }
-
         data = {kind: tuple(item.asdict() for item in sequence)}
         keys = ", ".join(item.key() for item in sequence)
-        logging.debug("Creating IOTA %s keys %s", kind, keys)
-        resp = await session.post(url, headers=headers, json=data)
-        if resp.status != 201:
-            raise FetchError(url, resp, headers=headers, json=data)
-        logging.debug("IOTA %s keys %s created with code %d", kind, keys,
-                      resp.status)
+        await Request(session=session,
+                      title="Create IOTA %s with keys %s",
+                      args=(kind, keys),
+                      url=f'{self.url_iotagent}/iot/{kind}',
+                      headers=self._headers(),
+                      body=data).post(lambda status: status == 201)
 
     async def _create_devices(self, session: aiohttp.ClientSession,
-                              sequence: Iterable[Entity]):
+                              sequence: Sequence[Entity]):
         return await self._create_iota(session, 'devices', sequence)
 
     async def _create_entities(self, session: aiohttp.ClientSession,
-                               sequence: Iterable[Entity]):
+                               sequence: Sequence[Entity]):
         """Create a sequence of entities using the CB API"""
-        assert self.token is not None
-        url = f'{self.url_cb}/v2/op/update'
-        headers = {
-            'Fiware-Service': self.service,
-            'Fiware-ServicePath': self.subservice,
-            'X-Auth-Token': self.token,
-            'Content-Type': 'application/json',
-        }
-
         def cb_entity(attrib: Entity) -> Optional[Mapping[str, Any]]:
-            """Turns an attrib into an entity suitable for the CB"""
+            """Turns an Entity into a dict suitable for the CB"""
             if not attrib.static_attributes:
                 return None
             data: Dict[str, Any] = {
@@ -125,46 +133,42 @@ class Api:
             return
 
         data = {'actionType': 'APPEND', 'entities': ents}
-        keys = ", ".join(item['id'] if item is not None else '' for item in ents)
-        logging.debug("Creating CB entities keys %s", keys)
+        keys = ", ".join(item['id'] if item is not None else ''
+                         for item in ents)
 
-        resp = await session.post(url, headers=headers, json=data)
-        if resp.status != 204:
-            raise FetchError(url, resp, headers=headers, json=data)
-        logging.debug("CB entities keys %s created with code %d", keys,
-                      resp.status)
+        await Request(session=session,
+                      title="Create CB entities with keys %s",
+                      args=(keys, ),
+                      url=f'{self.url_cb}/v2/op/update',
+                      headers=self._headers(),
+                      body=data).post(lambda status: status == 204)
 
     async def create_entities(self, session: aiohttp.ClientSession,
-                              entities: Iterable[Entity]):
+                              entities: Sequence[Entity]):
         """Create IOTA / CB Entities"""
-        await asyncio.gather(
-            # Only send to IOTA those entities that have at least one attribute
-            self._create_devices(
-                session, (entity for entity in entities if entity.attributes)),
-            self._create_entities(
-                session,
-                (entity for entity in entities if not entity.attributes)))
+        # Only send to IOTA those entities that have at least one attribute
+        iota_data = tuple(entity for entity in entities if entity.attributes)
+        ctxb_data = tuple(entity for entity in entities
+                          if not entity.attributes)
+        await gather(self._create_devices(session, iota_data),
+                     self._create_entities(session, ctxb_data))
 
     async def create_groups(self, session: aiohttp.ClientSession,
-                            sequence: Iterable[Group]):
+                            sequence: Sequence[Group]):
         """Create IOTA groups"""
         return await self._create_iota(session, 'services', sequence)
 
     async def _delete(self, session: aiohttp.ClientSession, url: str,
                       params: Optional[Mapping[str, Any]]):
         """Delete the group using the API"""
-        assert self.token is not None
-        headers = {
-            'Fiware-Service': self.service,
-            'Fiware-ServicePath': self.subservice,
-            'X-Auth-Token': self.token,
-        }
-        logging.debug("Deleting entity with URL %s and Params %s", url,
-                      json.dumps(params))
-        resp = await session.delete(url, headers=headers, params=params)
-        if (resp.status < 200 or resp.status > 204) and resp.status != 404:
-            raise FetchError(url, resp, headers=headers, json=params)
-        logging.debug("Entity %s deleted with code %d", url, resp.status)
+        await Request(
+            session=session,
+            title="Delete object at %s with params %s",
+            args=(url, params),
+            url=url,
+            headers=self._headers(),
+            params=params).delete(lambda status:
+                                  (200 <= status <= 204) or status == 404)
 
     async def delete_entity(self, session: aiohttp.ClientSession,
                             entity: Entity):
@@ -182,12 +186,12 @@ class Api:
             self._delete(session,
                          f'{self.url_cb}/v2/entities/{entity.entity_name}',
                          None))
-        await asyncio.gather(*tasks)
+        await gather(*tasks)
 
     async def delete_group(self, session: aiohttp.ClientSession, group: Group):
         """Delete the group using the API"""
         url = f'{self.url_iotagent}/iot/services'
-        await asyncio.gather(*(self._delete(session, url, {
+        await gather(*(self._delete(session, url, {
             'apikey': group.apikey,
             'protocol': protocol
         }) for protocol in group.protocol))
