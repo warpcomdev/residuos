@@ -93,7 +93,7 @@ async def create_entities(api: Api, groups: Sequence[Group],
                           entities: Sequence[Entity]):
     """Create entities using the Api"""
     async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(
-            verify_ssl=False)) as session:
+            ssl=False)) as session:
         await api.auth(session)
         logging.info("Creating objects")
         pool = Pool(session)
