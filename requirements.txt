@@ -9,7 +9,7 @@ chardet==3.0.4
 ConfigArgParse==1.2.3
 idna==2.9
 multidict==4.7.6
-pycares==3.1.1
+pycares==4.2.0
 pycparser==2.20
 PyYAML==5.3.1
 yarl==1.4.2
